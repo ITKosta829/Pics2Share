@@ -1,0 +1,42 @@
+{
+  "project_info": {
+    "project_number": "639681814027",
+    "firebase_url": "https://pics2share-3a170.firebaseio.com",
+    "project_id": "pics2share-3a170",
+    "storage_bucket": "pics2share-3a170.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:639681814027:android:c2cad564f3c8914a",
+        "android_client_info": {
+          "package_name": "com.example.deanc.pics2share"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "639681814027-qtdrkd5rj8qbq3b1rkabftplgceg2pct.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAvXDhLoITayijXWLAlYqlUVRBz9MYRCAc"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
