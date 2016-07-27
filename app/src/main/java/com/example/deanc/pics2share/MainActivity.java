@@ -12,6 +12,8 @@ import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.View;
 
+import com.firebase.client.Firebase;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -26,6 +28,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Firebase.setAndroidContext(this);
+        Firebase myFirebaseRef = new Firebase("https://console.firebase.google.com/project/pics2share-3a170");
         setContentView(R.layout.activity_main);
 
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
@@ -49,9 +53,9 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageSelected(int position) {
                 Log.d(TAG, "onPageSelected");
-                ViewPagerAdapter adapter = (ViewPagerAdapter) viewPager.getAdapter();
-                Fragment fragment = adapter.getItem(position);
-                changeBackgroundColor(fragment.getView());
+//                ViewPagerAdapter adapter = (ViewPagerAdapter) viewPager.getAdapter();
+//                Fragment fragment = adapter.getItem(position);
+//                changeBackgroundColor(fragment.getView());
             }
 
             @Override

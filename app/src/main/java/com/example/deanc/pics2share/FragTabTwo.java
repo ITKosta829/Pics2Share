@@ -10,9 +10,11 @@ import android.graphics.Matrix;
 import android.graphics.Typeface;
 import android.media.ExifInterface;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.support.annotation.NonNull;
 import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -21,9 +23,31 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.firebase.client.Firebase;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.AuthResult;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageMetadata;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
+
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Random;
 
 /**
  * Created by DeanC on 7/19/2016.
@@ -31,10 +55,20 @@ import java.util.Date;
 public class FragTabTwo extends Fragment {
 
     View mView;
-    private Uri fileUri; // file URI to store image/video
+    static  Uri fileUri; // file URI to store image/video
     public static Bitmap rotatedBitmap;
     private static int RESULT_LOAD_IMAGE = 1;
     private static int RESULT_TAKE_IMAGE = 2;
+    private final String pic_Storage_URL = "gs://pics2share-3a170.appspot.com/";
+    private final String pic_JSON_URL = "https://pics2share-3a170.firebaseio.com/";
+    String filePath = "";
+
+    FirebaseStorage storage;
+    StorageReference storageRef;
+    StorageReference images;
+    private FirebaseAuth mAuth;
+    private FirebaseAuth.AuthStateListener mAuthListener;
+
 
     public FragTabTwo() {
         // Required empty public constructor
@@ -45,30 +79,59 @@ public class FragTabTwo extends Fragment {
                              Bundle savedInstanceState) {
 
         mView = inflater.inflate(R.layout.frag_tab_two, container, false);
+        changeBackgroundColor(mView);
         ImageView camera = (ImageView) mView.findViewById(R.id.camera);
         ImageView gallery = (ImageView) mView.findViewById(R.id.gallery);
 
-        // 1. We'll store photos in a file. We set the file name here.
-        fileUri = Uri.fromFile(new File(createFileName()));
+        storage = FirebaseStorage.getInstance();
+        storageRef = storage.getReferenceFromUrl(pic_Storage_URL);
+
+        mAuth = FirebaseAuth.getInstance();
+        mAuthListener = new FirebaseAuth.AuthStateListener(){
+            @Override
+            public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
+                FirebaseUser user = firebaseAuth.getCurrentUser();
+                if (user != null) {
+                    // User is signed in
+                    Log.d("MyTag", "onAuthStateChanged:signed_in:" + user.getUid());
+                } else {
+                    // User is signed out
+                    Log.d("MyTag", "onAuthStateChanged:signed_out");
+                }
+            }
+        };
+        mAuth.signOut();
+        mAuth.signInAnonymously()
+                .addOnCompleteListener(getActivity(), new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        Log.d("MyTag", "signInAnonymously:onComplete:" + task.isSuccessful());
+
+                        if (!task.isSuccessful()) {
+                            Log.w("MyTag", "signInAnonymously", task.getException());
+                        }
+                    }
+                });
 
         setFonts();
 
         camera.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                // 1. We'll store photos in a file. We set the file name here.
+                createFileName();
+                FragTabTwo.fileUri = Uri.fromFile(new File(filePath));
+
+
                 captureImage();
+               // images = storageRef.child(fileUri.getLastPathSegment());
             }
         });
 
         gallery.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Intent i = new Intent(
-                        Intent.ACTION_PICK,
-                        android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-
-                startActivityForResult(i, RESULT_LOAD_IMAGE);
-
+                pickImage();
             }
         });
 
@@ -78,6 +141,7 @@ public class FragTabTwo extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
+        mAuth.addAuthStateListener(mAuthListener);
     }
 
     @Override
@@ -92,13 +156,36 @@ public class FragTabTwo extends Fragment {
         super.onResume();
     }
 
-    public String createFileName(){
+    @Override
+    public void onStop() {
+        super.onStop();
+        if (mAuthListener != null) {
+            mAuth.removeAuthStateListener(mAuthListener);
+        }
+    }
+
+    private void changeBackgroundColor(View v){
+
+        int[] androidColors = getResources().getIntArray(R.array.androidcolors);
+        int randomAndroidColor = androidColors[new Random().nextInt(androidColors.length)];
+        v.setBackgroundColor(randomAndroidColor);
+
+    }
+
+    public void pickImage(){
+        Intent i = new Intent(
+                Intent.ACTION_PICK,
+                android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+
+        startActivityForResult(i, RESULT_LOAD_IMAGE);
+    }
+
+    public void createFileName() {
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String ext = ".jpg";
         String name = "/Pics2Share_";
         String path = Environment.getExternalStorageDirectory().getAbsolutePath();
-        String outputFilePath = path + name + timeStamp + ext;
-        return outputFilePath;
+        filePath = path + name + timeStamp + ext;
     }
 
     private void captureImage() {
@@ -134,64 +221,19 @@ public class FragTabTwo extends Fragment {
             // We've successfully selected an image from the gallery.
 
             Uri selectedImage = data.getData();
-            String[] filePathColumn = {MediaStore.Images.Media.DATA};
+            images = storageRef.child(selectedImage.getLastPathSegment());
 
-            Cursor cursor = getContext().getContentResolver().query(selectedImage,
-                    filePathColumn, null, null, null);
-            cursor.moveToFirst();
-
-            int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
-            String picturePath = cursor.getString(columnIndex);
-            cursor.close();
-
-//          ImageView imageView = (ImageView) findViewById(R.id.imgView);
-//          imageView.setImageBitmap(BitmapFactory.decodeFile(picturePath));
+            uploadFromLocalFile(selectedImage);
 
         }
 
         if (requestCode == RESULT_TAKE_IMAGE && resultCode == Activity.RESULT_OK) {
 
             // We've successfully captured the image.
+            
             try {
 
-                // Now we need to ensure our photo is not unnecessarily rotated.
-                Matrix matrix = new Matrix();
-                ExifInterface ei = new ExifInterface(fileUri.getPath());
-
-                // Get orientation of the photograph
-                int orientation = ei.getAttributeInt(
-                        ExifInterface.TAG_ORIENTATION,
-                        ExifInterface.ORIENTATION_NORMAL);
-
-                // In case image is rotated, we rotate it back
-                switch (orientation) {
-
-                    case ExifInterface.ORIENTATION_ROTATE_90:
-                        matrix.postRotate(90);
-                        break;
-                    case ExifInterface.ORIENTATION_ROTATE_180:
-                        matrix.postRotate(180);
-                        break;
-                    case ExifInterface.ORIENTATION_ROTATE_270:
-                        matrix.postRotate(270);
-                }
-
-                // Now we get bitmap from the photograph and apply the rotation matrix above
-                BitmapFactory.Options options = new BitmapFactory.Options();
-
-                // Down-sizing image as it can throw OutOfMemory Exception for larger images.
-                options.inSampleSize = 2;
-
-                Bitmap bitmap = BitmapFactory.decodeFile(fileUri.getPath(), options);
-
-                rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0,
-                        bitmap.getWidth(), bitmap.getHeight(), matrix, true);
-
-                // Now display the image on the UI
-
-//                Intent intent = new Intent(getActivity(), Touch.class);
-//                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-//                startActivity(intent);
+                uploadFromLocalFile(fileUri);
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -208,4 +250,32 @@ public class FragTabTwo extends Fragment {
         tv2.setTypeface(tf);
 
     }
+
+    public void uploadFromLocalFile(Uri file) {
+
+        StorageMetadata metadata = new StorageMetadata.Builder()
+                .setContentType("image/jpg")
+                .build();
+
+        images = storageRef.child("images/" + fileUri.getLastPathSegment());
+        Log.d("MyTag", "File URI Segment: " + fileUri.getLastPathSegment());
+
+        UploadTask uploadTask = images.putFile(file, metadata);
+        uploadTask.addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception exception) {
+                Log.d("MyTag", "Upload Failed");
+                // Handle unsuccessful uploads
+            }
+        }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+            @Override
+            public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                Log.d("MyTag", "Upload Success");
+                // taskSnapshot.getMetadata(); // contains file metadata such as size, content-type, and download URL.
+                Uri downloadUrl = taskSnapshot.getDownloadUrl();
+            }
+        });
+
+    }
+
 }

@@ -24,16 +24,14 @@ public class FragTabOne extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
-
         mView = inflater.inflate(R.layout.frag_tab_one, container, false);
-
+        changeBackgroundColor(mView);
 
         return mView;
     }
 
     @Override
     public void onStart() {
-        changeBackgroundColor(mView);
         super.onStart();
     }
 
