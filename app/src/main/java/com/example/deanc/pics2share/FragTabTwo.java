@@ -3,14 +3,9 @@ package com.example.deanc.pics2share;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
 import android.graphics.Typeface;
-import android.media.ExifInterface;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
@@ -23,7 +18,6 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.firebase.client.Firebase;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -36,15 +30,7 @@ import com.google.firebase.storage.StorageMetadata;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Random;
@@ -55,13 +41,14 @@ import java.util.Random;
 public class FragTabTwo extends Fragment {
 
     View mView;
-    static  Uri fileUri; // file URI to store image/video
+    static Uri fileUri; // file URI to store image/video
     public static Bitmap rotatedBitmap;
     private static int RESULT_LOAD_IMAGE = 1;
     private static int RESULT_TAKE_IMAGE = 2;
     private final String pic_Storage_URL = "gs://pics2share-3a170.appspot.com/";
     private final String pic_JSON_URL = "https://pics2share-3a170.firebaseio.com/";
-    String filePath = "";
+    static String filePath = "";
+    static String fileName = "";
 
     FirebaseStorage storage;
     StorageReference storageRef;
@@ -87,7 +74,7 @@ public class FragTabTwo extends Fragment {
         storageRef = storage.getReferenceFromUrl(pic_Storage_URL);
 
         mAuth = FirebaseAuth.getInstance();
-        mAuthListener = new FirebaseAuth.AuthStateListener(){
+        mAuthListener = new FirebaseAuth.AuthStateListener() {
             @Override
             public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
                 FirebaseUser user = firebaseAuth.getCurrentUser();
@@ -119,18 +106,17 @@ public class FragTabTwo extends Fragment {
             @Override
             public void onClick(View view) {
                 // 1. We'll store photos in a file. We set the file name here.
-                createFileName();
+                createFilePath();
                 FragTabTwo.fileUri = Uri.fromFile(new File(filePath));
-
-
                 captureImage();
-               // images = storageRef.child(fileUri.getLastPathSegment());
+
             }
         });
 
         gallery.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                createFileName();
                 pickImage();
             }
         });
@@ -164,7 +150,7 @@ public class FragTabTwo extends Fragment {
         }
     }
 
-    private void changeBackgroundColor(View v){
+    private void changeBackgroundColor(View v) {
 
         int[] androidColors = getResources().getIntArray(R.array.androidcolors);
         int randomAndroidColor = androidColors[new Random().nextInt(androidColors.length)];
@@ -172,7 +158,7 @@ public class FragTabTwo extends Fragment {
 
     }
 
-    public void pickImage(){
+    public void pickImage() {
         Intent i = new Intent(
                 Intent.ACTION_PICK,
                 android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
@@ -183,9 +169,14 @@ public class FragTabTwo extends Fragment {
     public void createFileName() {
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String ext = ".jpg";
-        String name = "/Pics2Share_";
+        String name = "Pics2Share_";
+        fileName = name + timeStamp + ext;
+    }
+
+    public void createFilePath() {
+        createFileName();
         String path = Environment.getExternalStorageDirectory().getAbsolutePath();
-        filePath = path + name + timeStamp + ext;
+        filePath = path + "/" + fileName;
     }
 
     private void captureImage() {
@@ -221,8 +212,6 @@ public class FragTabTwo extends Fragment {
             // We've successfully selected an image from the gallery.
 
             Uri selectedImage = data.getData();
-            images = storageRef.child(selectedImage.getLastPathSegment());
-
             uploadFromLocalFile(selectedImage);
 
         }
@@ -230,7 +219,7 @@ public class FragTabTwo extends Fragment {
         if (requestCode == RESULT_TAKE_IMAGE && resultCode == Activity.RESULT_OK) {
 
             // We've successfully captured the image.
-            
+
             try {
 
                 uploadFromLocalFile(fileUri);
@@ -257,8 +246,8 @@ public class FragTabTwo extends Fragment {
                 .setContentType("image/jpg")
                 .build();
 
-        images = storageRef.child("images/" + fileUri.getLastPathSegment());
-        Log.d("MyTag", "File URI Segment: " + fileUri.getLastPathSegment());
+        images = storageRef.child("images/" + fileName);
+        Log.d("MyTag", "File URI Segment: " + fileName);
 
         UploadTask uploadTask = images.putFile(file, metadata);
         uploadTask.addOnFailureListener(new OnFailureListener() {
