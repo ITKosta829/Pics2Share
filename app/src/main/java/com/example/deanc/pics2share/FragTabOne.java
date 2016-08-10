@@ -6,6 +6,10 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.GridView;
+
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
 
 import java.util.Random;
 
@@ -15,6 +19,9 @@ import java.util.Random;
 public class FragTabOne extends Fragment {
 
     View mView;
+    FirebaseStorage storage;
+    StorageReference storageRef;
+    StorageReference imagesRef;
 
     public FragTabOne() {
         // Required empty public constructor
@@ -24,8 +31,17 @@ public class FragTabOne extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
+        final String pic_Storage_URL = "gs://pics2share-3a170.appspot.com/";
+
+        storage = FirebaseStorage.getInstance();
+        storageRef = storage.getReferenceFromUrl(pic_Storage_URL);
+        imagesRef = storageRef.child("images");
+
         mView = inflater.inflate(R.layout.frag_tab_one, container, false);
-        changeBackgroundColor(mView);
+
+        GridView gridView = (GridView)mView.findViewById(R.id.gridview);
+        gridView.setAdapter(new MyAdapter(getActivity()));
+        //changeBackgroundColor(mView);
 
         return mView;
     }
